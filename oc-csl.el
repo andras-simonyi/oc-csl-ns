@@ -98,6 +98,7 @@
 (declare-function citeproc-bt-entry-to-csl "ext:citeproc")
 (declare-function citeproc-blt-entry-to-csl "ext:citeproc")
 (declare-function citeproc-locale-getter-from-dir "ext:citeproc")
+(declare-function citeproc-itemgetter--parsebib--buffer "ext:citeproc")
 (declare-function citeproc-create "ext:citeproc")
 (declare-function citeproc-citation-create "ext:citeproc")
 (declare-function citeproc-append-citations "ext:citeproc")
@@ -368,15 +369,6 @@ or raise an error if the variable is unset."
     (other
      (user-error "Cannot handle relative style file name" other))))
 
-(defun org-cite-csl--parsebib-parse-bib-buffer ()
-  "Parse a BibTeX/biblatex buffer with Parsebib."
-  ;; Note: this is needed to support different Parsebib versions in use.
-  (cond ((fboundp 'parsebib-parse-buffer)
-	 (parsebib-parse-buffer nil nil t t))
-	((fboundp 'parsebib-parse-bib-buffer)
-	 (parsebib-parse-bib-buffer :expand-strings t :inheritance t))
-	(t (error "No Parsebib buffer parsing function is available"))))
-
 (defun org-cite-csl--itemgetter (bibliography)
   "Return Citeproc's \"itemgetter\" function for BIBLIOGRAPHY files.
 The function handles \".bib\", \".bibtex\" and \".json\" files."
@@ -395,7 +387,7 @@ The function handles \".bib\", \".bibtex\" and \".json\" files."
 	   (let ((to-csl-fun (if (eq bibtex-dialect 'biblatex)
 				 #'citeproc-blt-entry-to-csl
 			       #'citeproc-bt-entry-to-csl))
-                 (entries (car (org-cite-csl--parsebib-parse-bib-buffer))))
+                 (entries (car (citeproc-itemgetter--parsebib-buffer))))
              (maphash 
 	      (lambda (key entry)
                 (puthash key (funcall to-csl-fun entry)
