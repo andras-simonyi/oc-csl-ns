@@ -88,7 +88,6 @@
 ;; Many thanks to him!
 
 ;;; Code:
-(require 'parsebib)
 (require 'json)
 (require 'org-cite)
 (require 'citeproc nil t)
@@ -98,7 +97,7 @@
 (declare-function citeproc-bt-entry-to-csl "ext:citeproc")
 (declare-function citeproc-blt-entry-to-csl "ext:citeproc")
 (declare-function citeproc-locale-getter-from-dir "ext:citeproc")
-(declare-function citeproc-itemgetter--parsebib--buffer "ext:citeproc")
+(declare-function citeproc-itemgetter--parsebib-buffer "ext:citeproc")
 (declare-function citeproc-create "ext:citeproc")
 (declare-function citeproc-citation-create "ext:citeproc")
 (declare-function citeproc-append-citations "ext:citeproc")
