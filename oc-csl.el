@@ -89,7 +89,7 @@
 
 ;;; Code:
 (require 'json)
-(require 'org-cite)
+(require 'oc)
 (require 'citeproc nil t)
 (require 'citeproc-biblatex nil t)
 (declare-function citeproc-style-cite-note "ext:citeproc")
