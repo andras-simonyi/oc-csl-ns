@@ -610,6 +610,8 @@ INFO is the export state, as a property list."
               org-cite-csl-html-hanging-indent
               org-cite-csl-html-hanging-indent))
         output))
+      ('org-odt
+       output)
       ('latex
        (if (cdr (assq 'hanging-indent parameters))
            (format "\\begin{hangparas}{%s}{1}\n%s\n\\end{hangparas}"
