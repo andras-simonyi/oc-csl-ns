@@ -56,6 +56,7 @@
 ;;
 ;; - author (a), including caps (c), full (f), and caps-full (cf) variants,
 ;; - noauthor (na), including bare (b), caps (c) and bare-caps (bc) variants,
+;; - nocite (n),
 ;; - year (y), including a bare (b) variant,
 ;; - text (t). including caps (c), full (f), and caps-full (cf) variants,
 ;; - default style, including bare (b), caps (c) and bare-caps (bc) variants.
@@ -97,7 +98,8 @@
 (declare-function citeproc-bt-entry-to-csl "ext:citeproc")
 (declare-function citeproc-blt-entry-to-csl "ext:citeproc")
 (declare-function citeproc-locale-getter-from-dir "ext:citeproc")
-(declare-function citeproc-itemgetter--parsebib-buffer "ext:citeproc")
+(declare-function citeproc-itemgetters--parsebib--buffer "ext:citeproc")
+(declare-function citeproc-hash-itemgetter-from-any "ext:citeproc")
 (declare-function citeproc-create "ext:citeproc")
 (declare-function citeproc-citation-create "ext:citeproc")
 (declare-function citeproc-append-citations "ext:citeproc")
@@ -257,10 +259,13 @@ If nil then the Chicago author-date style is used as a fallback.")
   "Alist mapping locator names to locators.")
 
 (defconst org-cite-csl--label-regexp
-  (rx word-start
-      (regexp (regexp-opt (mapcar #'car org-cite-csl--label-alist) t))
-      (0+ digit)
-      (or word-start line-end (any ?\s ?\t)))
+  ;; Prior to Emacs-27.1 argument of `regexp' form must be a string literal.
+  ;; It is the reason why `rx' is avoided here.
+  (rx-to-string `(seq word-start
+                  (regexp ,(regexp-opt (mapcar #'car org-cite-csl--label-alist) t))
+                  (0+ digit)
+                  (or word-start line-end (any ?\s ?\t)))
+                t)
   "Regexp matching a label in a citation reference suffix.
 Label is in match group 1.")
 
@@ -351,6 +356,7 @@ corresponding to one of the output formats supported by Citeproc: `html',
     (cond
      ((org-export-derived-backend-p backend 'html) 'html)
      ((org-export-derived-backend-p backend 'latex) 'latex)
+     ((org-export-derived-backend-p backend 'odt) 'org-odt)
      (t 'org))))
 
 (defun org-cite-csl--style-file (info)
@@ -371,41 +377,7 @@ or raise an error if the variable is unset."
 (defun org-cite-csl--itemgetter (bibliography)
   "Return Citeproc's \"itemgetter\" function for BIBLIOGRAPHY files.
 The function handles \".bib\", \".bibtex\" and \".json\" files."
-  (let ((cache (make-hash-table :test #'equal)))
-    (dolist (file bibliography)
-      (pcase (file-name-extension file)
-        ("json"
-         (let ((json-array-type 'list)
-               (json-key-type 'symbol))
-           (dolist (item (json-read-file file))
-             (puthash (cdr (assq 'id item)) item cache))))
-        ((and (or "bib" "bibtex") ext)
-         (with-temp-buffer
-	   (insert-file-contents file)
-	   (bibtex-set-dialect (if (string= ext "bib") 'biblatex 'BibTeX) t)
-	   (let ((to-csl-fun (if (eq bibtex-dialect 'biblatex)
-				 #'citeproc-blt-entry-to-csl
-			       #'citeproc-bt-entry-to-csl))
-                 (entries (car (citeproc-itemgetter--parsebib-buffer))))
-             (maphash 
-	      (lambda (key entry)
-                (puthash key (funcall to-csl-fun entry)
-                         cache))
-              entries))))
-        ("org"
-	 (org-map-entries
-	  (lambda ()
-	    (-when-let (key-w-entry (citeproc-bt-from-org-headline))
-	      (puthash (car key-w-entry) (citeproc-bt-entry-to-csl
-					  (cdr key-w-entry))
-		       cache)))
-	  t (list file)))
-        (ext
-         (user-error "Unknown bibliography extension: %S" ext))))
-    (lambda (itemids)
-      (mapcar (lambda (id)
-                (cons id (gethash id cache)))
-              itemids))))
+  (citeproc-hash-itemgetter-from-any bibliography))
 
 (defun org-cite-csl--locale-getter ()
   "Return a locale getter.
@@ -548,20 +520,27 @@ INFO is the export state, as a property list.
 Return an alist (CITATION . OUTPUT) where CITATION object has been rendered as
 OUTPUT using Citeproc."
   (or (plist-get info :cite-citeproc-rendered-citations)
-      (let* ((citations (org-cite-list-citations info))
-             (processor (org-cite-csl--processor info))
-             (structures
-              (mapcar (lambda (c) (org-cite-csl--create-structure c info))
-                      citations)))
-        (citeproc-append-citations structures processor)
-        (let* ((rendered
-                (citeproc-render-citations
-                 processor
-                 (org-cite-csl--output-format info)
-                 (org-cite-csl--no-citelinks-p info)))
-               (result (seq-mapn #'cons citations rendered)))
-          (plist-put info :cite-citeproc-rendered-citations result)
-          result))))
+      (let (normal-citations nocite-ids
+	    (citations (org-cite-list-citations info))
+	    (processor (org-cite-csl--processor info)))
+	(dolist (citation citations)
+          (let ((style (car (org-cite-citation-style citation info))))
+            (if (and style (or (string= style "nocite") (string= style "n")))
+                (setq nocite-ids (append (org-cite-get-references citation t) nocite-ids))
+              (push citation normal-citations))))
+	(let ((structures
+	       (mapcar (lambda (c) (org-cite-csl--create-structure c info))
+		       normal-citations)))
+	  (citeproc-append-citations structures processor)
+          (citeproc-add-uncited nocite-ids processor)
+	  (let* ((rendered
+		  (citeproc-render-citations
+		   processor
+		   (org-cite-csl--output-format info)
+		   (org-cite-csl--no-citelinks-p info)))
+		 (result (seq-mapn #'cons citations rendered)))
+	    (plist-put info :cite-citeproc-rendered-citations result)
+	    result)))))
 
 
 ;;; Export capability
