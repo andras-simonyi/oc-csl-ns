@@ -653,4 +653,4 @@ property list."
 
 (provide 'org-cite-csl)
 (provide 'oc-csl)
-;;; oc-citeproc.el ends here
+;;; oc-csl.el ends here
