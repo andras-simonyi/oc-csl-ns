@@ -630,7 +630,8 @@ property list."
     (("noauthor" "na") ("bare" "b") ("caps" "c") ("bare-caps" "bc"))
     (("year" "y") ("bare" "b"))
     (("text" "t") ("caps" "c") ("full" "f") ("caps-full" "cf"))
-    (("nil") ("bare" "b") ("caps" "c") ("bare-caps" "bc"))))
+    (("nil") ("bare" "b") ("caps" "c") ("bare-caps" "bc"))
+    (("nocite" "n"))))
 
 (provide 'org-cite-csl)
 (provide 'oc-csl)
